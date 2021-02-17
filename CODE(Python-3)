@@ -1,7 +1,277 @@
 import warnings
 warnings.filterwarnings('ignore')
+
 from scipy import stats
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+
+cancer = pd.read_csv('C:\\Users\\CHITRANG\\Downloads\\cancer_reg.csv')
+
+cancer.head()
+
+cancer.shape
+
+cancer.info()
+
+cancer.describe()
+
+cancer.isnull().sum()*100/len(cancer)
+
+cancer=cancer.drop(cancer.loc[:, cancer.isnull().sum()*100/len(cancer) >= 50],axis=1)
+
+cancer= cancer.drop(['binnedInc','Geography'] , axis=1)
+
+cancer.shape
+
+cancer['PctEmployed16_Over'].isnull().sum()
+
+cancer['PctEmployed16_Over'].mean()
+
+cancer['PctPrivateCoverageAlone'].mean()
+
+cancer['PctEmployed16_Over'].fillna(cancer['PctEmployed16_Over'].median(), inplace=True)
+
+cancer['PctPrivateCoverageAlone'].fillna(cancer['PctPrivateCoverageAlone'].median(), inplace=True)
+
+cancer.isnull().sum()*100/len(cancer)
+
+z = np.abs(stats.zscore(cancer))
+print(z)
+
+print(z[10][1])
+
+cancer = cancer[(z < 4).all(axis=1)]
+
+cancer.describe()
+
+from sklearn.model_selection import train_test_split
+
+# We specify this so that the train and test data set always have the same rows, respectively
+np.random.seed(0)
+cancer_train, cancer_test = train_test_split(cancer, train_size = 0.7, test_size = 0.3, random_state = 100)
+
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+
+# Apply scaler() to all the columns except the 'yes-no' and 'dummy' variables
+num_vars = cancer.columns
+
+cancer_train[num_vars] = scaler.fit_transform(cancer_train[num_vars])
+
+cancer_train.head()
+
+cancer_train.describe()
+
+# Let's check the correlation coefficients to see which variables are highly correlated
+
+plt.figure(figsize = (24, 24))
+sns.heatmap(cancer_train.corr(), annot = True, )
+plt.show()
+
+plt.figure(figsize=[6,6])
+plt.scatter(cancer_train.TARGET_deathRate, cancer_train.povertyPercent)
+plt.show()
+
+plt.figure(figsize=[6,6])
+plt.scatter(cancer_train.TARGET_deathRate, cancer_train.PctPublicCoverageAlone)
+plt.show()
+
+# Dividing into X and Y sets for building building
+
+y_train = cancer_train.pop('TARGET_deathRate')
+X_train = cancer_train
+
+import statsmodels.api as sm
+
+# Add a constant
+X_train_lm = sm.add_constant(X_train[['PctPublicCoverageAlone']])
+
+# Create a first fitted model
+lr = sm.OLS(y_train, X_train_lm).fit()
+
+# Check the parameters obtained
+
+lr.params
+
+# Let's visualise the data with a scatter plot and the fitted regression line
+plt.scatter(X_train_lm.iloc[:, 1], y_train)
+plt.plot(X_train_lm.iloc[:, 1], 0.298 + 0.423*X_train_lm.iloc[:, 1], 'r')
+plt.show()
+
+# Print a summary of the linear regression model obtained
+print(lr.summary())
+
+# Assign all the feature variables to X
+X_train_lm = X_train[['PctPublicCoverageAlone', 'povertyPercent']]
+
+# Build a linear model
+X_train_lm = sm.add_constant(X_train_lm)
+
+lr = sm.OLS(y_train, X_train_lm).fit()
+
+lr.params
+
+# Check the summary
+print(lr.summary())
+
+X_train_lm = X_train[['incidenceRate', 'povertyPercent', 'PctHS25_Over', 'PctUnemployed16_Over', 'PctPublicCoverage', 'PctPublicCoverageAlone']]
+
+# Build a linear model
+
+X_train_lm = sm.add_constant(X_train_lm)
+
+lr = sm.OLS(y_train, X_train_lm).fit()
+
+lr.params
+
+# Print the summary of the model
+
+print(lr.summary())
+
+# Build a linear model
+
+X_train_lm = sm.add_constant(X_train)
+
+lr_1 = sm.OLS(y_train, X_train_lm).fit()
+
+lr_1.params
+
+print(lr_1.summary())
+
+# Check for the VIF values of the feature variables. 
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+
+# Create a dataframe that will contain the names of all the feature variables and their respective VIFs
+vif = pd.DataFrame()
+vif['Features'] = X_train.columns
+vif['VIF'] = [variance_inflation_factor(X_train.values, i) for i in range(X_train.shape[1])]
+vif['VIF'] = round(vif['VIF'], 2)
+vif = vif.sort_values(by = "VIF", ascending = False)
+vif
+
+X = X_train.drop('MedianAge', 1)
+
+# Build a third fitted model
+X_train_lm = sm.add_constant(X)
+
+lr_2 = sm.OLS(y_train, X_train_lm).fit()
+
+# Print the summary of the model
+print(lr_2.summary())
+
+# Calculate the VIFs again for the new model
+
+vif = pd.DataFrame()
+vif['Features'] = X.columns
+vif['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+vif['VIF'] = round(vif['VIF'], 2)
+vif = vif.sort_values(by = "VIF", ascending = False)
+vif
+
+X = X.drop(['MedianAgeFemale','studyPerCap','PctAsian','PctPrivateCoverageAlone'], 1)
+# Build a second fitted model
+X_train_lm = sm.add_constant(X)
+
+lr_3 = sm.OLS(y_train, X_train_lm).fit()
+
+# Print the summary of the model
+print(lr_3.summary())
+
+# Calculate the VIFs again for the new model
+vif = pd.DataFrame()
+vif['Features'] = X.columns
+vif['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+vif['VIF'] = round(vif['VIF'], 2)
+vif = vif.sort_values(by = "VIF", ascending = False)
+vif
+
+X = X.drop(['medIncome','PctBachDeg18_24','PctWhite','PctEmpPrivCoverage','PctPrivateCoverage','PctMarriedHouseholds'], 1)
+# Build a second fitted model
+X_train_lm = sm.add_constant(X)
+
+lr_4 = sm.OLS(y_train, X_train_lm).fit()
+
+# Print the summary of the model
+print(lr_4.summary())
+
+# Calculate the VIFs again for the new model
+vif = pd.DataFrame()
+vif['Features'] = X.columns
+vif['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+vif['VIF'] = round(vif['VIF'], 2)
+vif = vif.sort_values(by = "VIF", ascending = False)
+vif
+
+X = X.drop(['PctBlack', 'PctHS25_Over','PctNoHS18_24','PercentMarried','MedianAgeMale','popEst2015'], 1)
+# Build a second fitted model
+X_train_lm = sm.add_constant(X)
+
+lr_5 = sm.OLS(y_train, X_train_lm).fit()
+
+# Print the summary of the model
+print(lr_5.summary())
+
+# Calculate the VIFs again for the new model
+vif = pd.DataFrame()
+vif['Features'] = X.columns
+vif['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+vif['VIF'] = round(vif['VIF'], 2)
+vif = vif.sort_values(by = "VIF", ascending = False)
+vif
+
+X = X.drop(['PctPublicCoverageAlone','PctPublicCoverage','PctEmployed16_Over','BirthRate','AvgHouseholdSize','PctUnemployed16_Over','PctHS18_24'], 1)
+# Build a second fitted model
+X_train_lm = sm.add_constant(X)
+
+lr_6 = sm.OLS(y_train, X_train_lm).fit()
+
+# Print the summary of the model
+print(lr_6.summary())
+
+# Calculate the VIFs again for the new model
+vif = pd.DataFrame()
+vif['Features'] = X.columns
+vif['VIF'] = [variance_inflation_factor(X.values, i) for i in range(X.shape[1])]
+vif['VIF'] = round(vif['VIF'], 2)
+vif = vif.sort_values(by = "VIF", ascending = False)
+vif
+
+y_train_price = lr_6.predict(X_train_lm)
+
+# Plot the histogram of the error terms
+fig = plt.figure()
+sns.distplot((y_train - y_train_price), bins = 20)
+fig.suptitle('Error Terms', fontsize = 20)                  # Plot heading 
+plt.xlabel('Errors', fontsize = 18)                         # X-label
+
+cancer_df
+
+num_vars = cancer.columns
+
+cancer_test[num_vars] = scaler.transform(cancer_test[num_vars])
+
+cancer_test.describe()
+
+X_train_lm = X_train_lm.drop(['const'], axis=1)
+
+y_test = cancer_test.pop('TARGET_deathRate')
+X_test = cancer_test
+
+# Creating X_test_new dataframe by dropping variables from X_test
+X_test_new = X_test[X_train_lm.columns]
+
+# Adding a constant variable 
+X_test_new = sm.add_constant(X_test_new)
+
+# Making predictions
+y_pred = lr_7.predict(X_test_new)
+
+# Plotting y_test and y_pred to understand the spread
+
+fig = plt.figure()
+plt.scatter(y_test, y_pred)
+fig.suptitle('y_test vs y_pred', fontsize = 20)              # Plot heading 
+plt.xlabel('y_test', fontsize = 18)                          # X-label
+plt.ylabel('y_pred', fontsize = 16)      
